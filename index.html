@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Учёт опоздавших студентов</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Учёт опоздавших студентов</h1>
+      <p class="lead">Имитация пропускной системы колледжа. В журнал автоматически попадают студенты 1–2 курсов, прошедшие после начала первой пары.</p>
+    </div>
+    <div class="clock">
+      <span>Начало первой пары</span>
+      <strong>{{ lesson_start }}</strong>
+    </div>
+  </header>
+
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <p class="message {{ category }}">{{ message }}</p>
+      {% endfor %}
+    {% endwith %}
+
+    <section class="panel controls">
+      <form action="{{ url_for('passage') }}" method="post">
+        <h2>Имитировать проход</h2>
+        <label>
+          Карта человека
+          <select name="card_code" required>
+            {% for card in cards %}
+              <option value="{{ card.code }}">
+                {{ card.code }} — {{ card.full_name }}
+                {% if card.group_name %}({{ card.group_name }}, {{ card.course }} курс){% else %}({{ {'teacher': 'преподаватель', 'employee': 'работник'}[card.role] }}){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Дата и время прохода
+          <input type="datetime-local" name="passed_at" value="{{ now }}" required>
+        </label>
+        <button type="submit">Зарегистрировать проход</button>
+      </form>
+
+      <form action="{{ url_for('settings') }}" method="post">
+        <h2>Настройки</h2>
+        <label>
+          Начало первой пары
+          <input type="time" name="lesson_start" value="{{ lesson_start }}" required>
+        </label>
+        <button type="submit" class="secondary">Сохранить время</button>
+        <p class="note">Третий курс, преподаватели и работники отображаются в ленте, но не записываются в журнал.</p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Результат обработки</p>
+          <h2>Журнал опозданий</h2>
+        </div>
+        <form class="filter" action="{{ url_for('index') }}" method="get">
+          <input type="date" name="date" value="{{ selected_date }}">
+          <button type="submit" class="secondary">Показать</button>
+          <a href="{{ url_for('export_csv', date=selected_date) }}">Скачать CSV</a>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Дата</th><th>Время</th><th>Студент</th><th>Группа</th><th>Курс</th><th>Опоздание</th></tr>
+          </thead>
+          <tbody>
+            {% for row in late_records %}
+              <tr>
+                <td>{{ row.late_date }}</td>
+                <td>{{ row.passed_at[11:16] }}</td>
+                <td>{{ row.full_name }}</td>
+                <td>{{ row.group_name }}</td>
+                <td>{{ row.course }}</td>
+                <td><span class="badge late">{{ row.minutes_late|delay }}</span></td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="empty">Опозданий пока нет</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Данные турникета</p>
+          <h2>Последние проходы</h2>
+        </div>
+        <form action="{{ url_for('clear') }}" method="post" onsubmit="return confirm('Очистить учебные события?')">
+          <button type="submit" class="danger">Очистить события</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Дата и время</th><th>Карта</th><th>Человек</th><th>Категория</th><th>Решение</th></tr>
+          </thead>
+          <tbody>
+            {% for row in passages %}
+              <tr>
+                <td>{{ row.passed_at[:10] }} {{ row.passed_at[11:16] }}</td>
+                <td><code>{{ row.code }}</code></td>
+                <td>{{ row.full_name }}</td>
+                <td>
+                  {% if row.role == 'student' %}
+                    {{ row.course }} курс, {{ row.group_name }}
+                  {% elif row.role == 'teacher' %}
+                    преподаватель
+                  {% else %}
+                    работник
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.is_late %}
+                    <span class="badge late">занесён в журнал</span>
+                  {% else %}
+                    <span class="badge ok">не занесён</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="empty">Проходов пока нет</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
